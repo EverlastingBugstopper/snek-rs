@@ -1,10 +1,9 @@
 use crate::core::{Apple, Direction, Position, Segment, SlitherResult, State};
-use crate::tui::views::title_screen;
 
 use cursive::event::{Event, EventResult};
 use cursive::{
     view::View,
-    views::{Dialog, LinearLayout, NamedView, Panel},
+    views::{Dialog, LinearLayout, Panel},
     Cursive, Printer, Vec2,
 };
 
