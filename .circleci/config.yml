@@ -33,6 +33,9 @@ jobs:
     steps:
       - checkout
       - rust/install
+      - run:
+          name: Install cargo-nextest
+          command: curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
       - restore_cache:
           keys:
             - rust-target-v1-linux-{{ checksum "Cargo.lock" }}
