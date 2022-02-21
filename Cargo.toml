@@ -1,0 +1,27 @@
+[package]
+authors = ["Avery Harnish <averyharnish@gmail.com>"]
+edition = "2021"
+name = "snek_rs"
+version = "0.1.0"
+
+[features]
+default = ["tui"]
+tui = ["cursive", "term_size"]
+gui = []
+
+[lib]
+name = "snek_rs"
+path = "./src/lib.rs"
+
+[[bin]]
+name = "snek"
+path = "./src/main.rs"
+
+[dependencies]
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["ansi", "fmt"] }
+tracing-appender = "0.2"
+
+# tui dependencies
+cursive = { version = "0.17", features = ["crossterm-backend"], optional = true }
+term_size = { version = "0.3", optional = true }
