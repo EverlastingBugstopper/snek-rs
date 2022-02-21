@@ -28,6 +28,7 @@ impl State {
         let slither_result = self.snek.try_slither(&self.walls, &self.apple);
         if let SlitherResult::Grew(_) | SlitherResult::AteTheWorld = slither_result {
             self.scoreboard.increment_score();
+            tracing::info!("ate an apple, new score: {}", self.scoreboard.get_score())
         }
         slither_result
     }
@@ -107,6 +108,30 @@ mod tests {
         assert_eq!(state.tick(), SlitherResult::Grew(Direction::Down));
         assert_eq!(state.get_snek().count_segments(), 2);
         assert_eq!(state.get_score(), 1);
+    }
+
+    #[test]
+    fn it_cannot_turn_into_itself() {
+        let mut state = State::new(10, 10);
+        // plant an apple to the right of the default snek
+        assert_eq!(state.get_score(), 0);
+        assert_eq!(state.get_snek().get_direction(), Direction::Right);
+        assert_eq!(state.get_snek().count_segments(), 1);
+
+        // tick the game forward
+        assert_eq!(state.tick(), SlitherResult::Slithered(Direction::Right));
+
+        // turn down
+        assert!(state.turn_snek(Direction::Down));
+
+        // make sure we cannot turn left before the next tick (into itself)
+        assert!(!state.turn_snek(Direction::Left));
+
+        // tick the game forward, we should continue down since we couldn't turn left earlier
+        assert_eq!(state.tick(), SlitherResult::Slithered(Direction::Down));
+
+        // now we can turn left
+        assert!(state.turn_snek(Direction::Left));
     }
 
     #[test]

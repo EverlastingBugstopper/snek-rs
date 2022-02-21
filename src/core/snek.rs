@@ -60,7 +60,7 @@ impl Snek {
     }
 
     pub fn turn(&mut self, attempted_direction: Direction) -> bool {
-        let can_turn = match self.direction {
+        let can_turn = match self.get_head().get_direction() {
             Direction::Right | Direction::Left => {
                 attempted_direction != Direction::Right && attempted_direction != Direction::Left
             }
