@@ -1,0 +1,44 @@
+version: 2.1
+
+orbs:
+  rust: circleci/rust@1.5.0
+
+workflows:
+  lint:
+    jobs:
+      - xtask:
+          name: Lint
+          matrix:
+            parameters:
+              command: [lint]
+      - xtask:
+          name: Test
+          matrix:
+            parameters:
+              command: [test]
+
+jobs:
+  xtask:
+    parameters:
+      command:
+        type: enum
+        enum: [lint, test]
+      options:
+        type: string
+        default: "--verbose"
+    docker:
+      - image: cimg/base:2022.02
+    steps:
+      - checkout
+      - rust/install
+      - restore_cache:
+          keys:
+            - rust-target-v1-linux-{{ checksum "Cargo.lock" }}
+
+      - run:
+          command: cargo xtask << parameters.command >> << parameters.options >>
+
+      - save_cache:
+          key: rust-target-v1-linux-{{ checksum "Cargo.lock" }}
+          paths:
+            - target/
