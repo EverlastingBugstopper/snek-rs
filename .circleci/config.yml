@@ -11,6 +11,8 @@ workflows:
           matrix:
             parameters:
               command: [lint]
+  test:
+    jobs:
       - xtask:
           name: Test
           matrix:
