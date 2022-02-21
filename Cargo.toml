@@ -23,5 +23,8 @@ tracing-subscriber = { version = "0.3", features = ["ansi", "fmt"] }
 tracing-appender = "0.2"
 
 # tui dependencies
-cursive = { version = "0.17", features = ["crossterm-backend"], optional = true }
+cursive = { version = "0.17", default-features = false, features = ["crossterm-backend"], optional = true }
 term_size = { version = "0.3", optional = true }
+
+[workspace]
+members = ["xtask"]

@@ -5,7 +5,7 @@ use tracing_subscriber::fmt::format::FmtSpan;
 
 fn main() {
     let current_dir = std::env::current_dir().unwrap();
-    let log_file = "tui-snek.out";
+    let log_file = "tui-snek.log";
     let file_appender = tracing_appender::rolling::never(current_dir, log_file);
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
     let format = tracing_subscriber::fmt::format().without_time().pretty();

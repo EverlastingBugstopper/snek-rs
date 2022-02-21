@@ -17,6 +17,12 @@ impl Scoreboard {
     }
 }
 
+impl Default for Scoreboard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

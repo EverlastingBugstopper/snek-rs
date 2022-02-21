@@ -20,3 +20,9 @@ impl Tui {
         self.app.run();
     }
 }
+
+impl Default for Tui {
+    fn default() -> Self {
+        Self::new()
+    }
+}

@@ -77,7 +77,7 @@ impl Snek {
     pub fn try_slither(&mut self, walls: &Walls, apple: &Apple) -> SlitherResult {
         self.get_head_mut().direction = self.direction;
         if let Some(death_cause) = self.inch_head() {
-            return SlitherResult::Died(death_cause);
+            SlitherResult::Died(death_cause)
         } else if self.did_eat_apple____mmmm(apple) {
             if self.segments.len() == walls.get_max_segments() {
                 SlitherResult::AteTheWorld
@@ -103,7 +103,7 @@ impl Snek {
     /// also the snek could die if it inches its head into thL
     /// so be careful.                                       L
     fn inch_head(&mut self) -> Option<DeathCause> {
-        let mut new_head = self.get_head().clone();
+        let mut new_head = self.get_head().to_owned();
         self.get_head_mut().make_tail();
         if let Some(death_cause) = new_head.inch() {
             self.inch_tail();
@@ -129,7 +129,8 @@ impl Snek {
     }
 
     fn face_the_reaper(&mut self, walls: &Walls) -> Option<DeathCause> {
-        self.check_wall_kill(walls).or(self.check_tail_kill())
+        self.check_wall_kill(walls)
+            .or_else(|| self.check_tail_kill())
     }
 
     fn check_wall_kill(&mut self, walls: &Walls) -> Option<DeathCause> {
