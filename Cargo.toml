@@ -18,6 +18,7 @@ name = "snek"
 path = "./src/main.rs"
 
 [dependencies]
+rayon = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["ansi", "fmt"] }
 tracing-appender = "0.2"

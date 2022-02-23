@@ -7,6 +7,9 @@ use cursive::{
     Cursive, Printer, Vec2,
 };
 
+use rayon::prelude::*;
+use std::sync::mpsc::channel;
+
 pub fn new_game(app: &mut Cursive) {
     tracing::debug!("new game");
     let xy = app.screen_size();
@@ -121,13 +124,20 @@ impl BoardView {
 
 impl View for BoardView {
     fn draw(&self, printer: &Printer) {
-        for (i, cell) in self.cells.iter().enumerate() {
-            let position = self.get_position_from_cell_idx(i);
-            let (x, y) = position.get_coordinates();
+        let (sender, receiver) = channel();
+        self.cells
+            .par_iter()
+            .enumerate()
+            .for_each_with(sender, |sender, (i, c)| {
+                let position = self.get_position_from_cell_idx(i);
+                let (x, y) = position.get_coordinates();
 
-            let text = cell.get_char().to_string();
+                let text = c.get_char().to_string();
+                sender.send(((x, y), text)).unwrap();
+            });
+        receiver.iter().for_each(|((x, y), text)| {
             printer.print((x, y), &text);
-        }
+        });
     }
 
     fn required_size(&mut self, _: Vec2) -> Vec2 {
@@ -146,7 +156,7 @@ impl View for BoardView {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 enum Cell {
     Snek(Segment),
     Apple(Apple),

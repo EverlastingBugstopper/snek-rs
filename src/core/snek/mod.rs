@@ -1,6 +1,18 @@
+mod death;
+mod direction;
+mod segment;
+mod slither;
+
+pub use death::DeathCause;
+pub use direction::Direction;
+pub use segment::Segment;
+pub use slither::SlitherResult;
+
 use crate::core::{Apple, Position, Walls};
 
-#[derive(Debug)]
+use rayon::prelude::*;
+
+#[derive(Debug, Clone)]
 pub struct Snek {
     segments: Vec<Segment>,
     direction: Direction,
@@ -23,7 +35,7 @@ impl Snek {
     }
 
     #[cfg(test)]
-    pub(crate) fn get_segment(&self, index: usize) -> Option<&Segment> {
+    pub fn get_segment(&self, index: usize) -> Option<&Segment> {
         self.segments.get(index)
     }
 
@@ -32,7 +44,7 @@ impl Snek {
     }
 
     pub fn get_segment_positions(&self) -> Vec<Position> {
-        self.segments.iter().map(|s| s.get_position()).collect()
+        self.segments.par_iter().map(|s| s.get_position()).collect()
     }
 
     pub fn count_segments(&self) -> usize {
@@ -60,6 +72,7 @@ impl Snek {
     }
 
     pub fn turn(&mut self, attempted_direction: Direction) -> bool {
+        // check the head's current direction
         let can_turn = match self.get_head().get_direction() {
             Direction::Right | Direction::Left => {
                 attempted_direction != Direction::Right && attempted_direction != Direction::Left
@@ -69,21 +82,33 @@ impl Snek {
             }
         };
         if can_turn {
+            // update the snek's _overall_ direction
+            // this will only udpate the heads direction in try_slither
+            // when we are actually ready to move
+            // this prevents someone from going right, then up, then left, causing death, all before the next tick even occurred
             self.direction = attempted_direction;
         }
         can_turn
     }
 
     pub fn try_slither(&mut self, walls: &Walls, apple: &Apple) -> SlitherResult {
-        self.get_head_mut().direction = self.direction;
+        // get the snek's _overall_ direction
+        let direction = self.get_direction();
+        // set the head to the new direction
+        self.get_head_mut().set_direction(direction);
+
+        // move the head forward and check if it killed the snek
         if let Some(death_cause) = self.inch_head() {
             SlitherResult::Died(death_cause)
+        // check if the inch forward caused us to eat an apple
         } else if self.did_eat_apple____mmmm(apple) {
             if self.segments.len() == walls.get_max_segments() {
                 SlitherResult::AteTheWorld
             } else {
                 SlitherResult::Grew(self.direction)
             }
+        // if we didn't eat an apple we have to inch its tail forward as well
+        // and then check if we ran into ourselves or a wall
         } else {
             self.inch_tail();
             if let Some(death_cause) = self.face_the_reaper(walls) {
@@ -107,6 +132,7 @@ impl Snek {
         self.get_head_mut().make_tail();
         if let Some(death_cause) = new_head.inch() {
             self.inch_tail();
+            self.kill();
             Some(death_cause)
         } else {
             self.segments.push(new_head);
@@ -144,139 +170,24 @@ impl Snek {
 
     fn check_tail_kill(&mut self) -> Option<DeathCause> {
         let head_position = self.get_head().get_position();
-        for segment in self.get_tail() {
-            if head_position == segment.get_position() {
-                self.kill();
-                return Some(DeathCause::Tail);
-            }
+        let should_kill = false;
+        self.segments[0..self.segments.len() - 1]
+            .par_iter()
+            .for_each_with(should_kill, |sk, segment| {
+                if head_position == segment.get_position() {
+                    *sk = true;
+                }
+            });
+        if should_kill {
+            self.kill();
+            Some(DeathCause::Tail)
+        } else {
+            None
         }
-        None
     }
 
     fn kill(&mut self) {
         self.alive = false;
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Segment {
-    position: Position,
-    direction: Direction,
-    head: bool,
-}
-
-impl Segment {
-    pub fn new_head(position: Position, direction: Direction) -> Self {
-        Self {
-            position,
-            direction,
-            head: true,
-        }
-    }
-
-    pub fn make_tail(&mut self) {
-        self.head = false;
-    }
-
-    pub fn is_head(&self) -> bool {
-        self.head
-    }
-
-    pub fn is_tail(&self) -> bool {
-        !self.head
-    }
-
-    pub fn get_position(&self) -> Position {
-        self.position
-    }
-
-    pub fn get_direction(&self) -> Direction {
-        self.direction
-    }
-
-    fn inch(&mut self) -> Option<DeathCause> {
-        self.position.nudge(self.direction)
-    }
-
-    pub fn get_char(&self) -> char {
-        if self.is_head() {
-            self.direction.get_head_char()
-        } else {
-            self.direction.get_tail_char()
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Direction {
-    Up,
-    Down,
-    Left,
-    Right,
-}
-
-impl Direction {
-    pub fn get_head_char(&self) -> char {
-        match self {
-            Direction::Up => '^',
-            Direction::Down => 'v',
-            Direction::Left => '<',
-            Direction::Right => '>',
-        }
-    }
-
-    pub fn get_tail_char(&self) -> char {
-        match self {
-            Direction::Up | Direction::Down => '|',
-            Direction::Left | Direction::Right => '-',
-        }
-    }
-
-    pub fn describe(&self) -> &str {
-        match self {
-            Direction::Up => "up",
-            Direction::Down => "down",
-            Direction::Left => "left",
-            Direction::Right => "right",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum SlitherResult {
-    Died(DeathCause),
-    Grew(Direction),
-    Slithered(Direction),
-    AteTheWorld,
-}
-
-impl SlitherResult {
-    pub fn describe(&self) -> String {
-        match self {
-            SlitherResult::Died(death_cause) => {
-                format!("snek died because it {}", death_cause.describe())
-            }
-            SlitherResult::Grew(direction) => format!("snek grew {}", direction.describe()),
-            SlitherResult::Slithered(direction) => {
-                format!("snek slithered {}", direction.describe())
-            }
-            SlitherResult::AteTheWorld => "snek ate the world".to_string(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum DeathCause {
-    Wall,
-    Tail,
-}
-
-impl DeathCause {
-    pub fn describe(&self) -> &str {
-        match self {
-            DeathCause::Wall => "ran into the wall",
-            DeathCause::Tail => "ran into its own tail",
-        }
     }
 }
 

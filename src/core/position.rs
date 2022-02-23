@@ -17,15 +17,15 @@ impl Position {
                 if self.y == 0 {
                     return Some(DeathCause::Wall);
                 }
-                self.y -= 1
+                self.y -= 1;
             }
             Direction::Down => self.y += 1,
             Direction::Right => self.x += 1,
             Direction::Left => {
-                if self.y == 0 {
+                if self.x == 0 {
                     return Some(DeathCause::Wall);
                 }
-                self.x -= 1
+                self.x -= 1;
             }
         }
         None

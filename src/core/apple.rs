@@ -1,6 +1,6 @@
 use crate::core::Position;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Apple {
     position: Position,
 }
