@@ -11,6 +11,6 @@ pub fn title_screen(app: &mut Cursive) {
             .title("snek")
             .button("sstart", game::new_game)
             .button("high sscores", high_scores::start)
-            .button("sstop", |snek| snek.quit()),
+            .button("sstop", |app| app.quit()),
     );
 }

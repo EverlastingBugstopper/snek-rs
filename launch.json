@@ -1,0 +1,95 @@
+[
+    {
+        "type": "lldb",
+        "request": "launch",
+        "name": "Debug executable 'xtask'",
+        "cargo": {
+            "args": [
+                "build",
+                "--bin=xtask",
+                "--package=xtask"
+            ],
+            "filter": {
+                "name": "xtask",
+                "kind": "bin"
+            }
+        },
+        "args": [],
+        "cwd": "${workspaceFolder}"
+    },
+    {
+        "type": "lldb",
+        "request": "launch",
+        "name": "Debug unit tests in executable 'xtask'",
+        "cargo": {
+            "args": [
+                "test",
+                "--no-run",
+                "--bin=xtask",
+                "--package=xtask"
+            ],
+            "filter": {
+                "name": "xtask",
+                "kind": "bin"
+            }
+        },
+        "args": [],
+        "cwd": "${workspaceFolder}"
+    },
+    {
+        "type": "lldb",
+        "request": "launch",
+        "name": "Debug unit tests in library 'snek_rs'",
+        "cargo": {
+            "args": [
+                "test",
+                "--no-run",
+                "--lib",
+                "--package=snek_rs"
+            ],
+            "filter": {
+                "name": "snek_rs",
+                "kind": "lib"
+            }
+        },
+        "args": [],
+        "cwd": "${workspaceFolder}"
+    },
+    {
+        "type": "lldb",
+        "request": "launch",
+        "name": "Debug executable 'snek'",
+        "cargo": {
+            "args": [
+                "build",
+                "--bin=snek",
+                "--package=snek_rs"
+            ],
+            "filter": {
+                "name": "snek",
+                "kind": "bin"
+            }
+        },
+        "args": [],
+        "cwd": "${workspaceFolder}"
+    },
+    {
+        "type": "lldb",
+        "request": "launch",
+        "name": "Debug unit tests in executable 'snek'",
+        "cargo": {
+            "args": [
+                "test",
+                "--no-run",
+                "--bin=snek",
+                "--package=snek_rs"
+            ],
+            "filter": {
+                "name": "snek",
+                "kind": "bin"
+            }
+        },
+        "args": [],
+        "cwd": "${workspaceFolder}"
+    }
+]

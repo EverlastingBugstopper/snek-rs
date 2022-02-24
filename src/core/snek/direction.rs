@@ -7,15 +7,6 @@ pub enum Direction {
 }
 
 impl Direction {
-    pub fn get_head_char(&self) -> char {
-        match self {
-            Direction::Up => '^',
-            Direction::Down => 'v',
-            Direction::Left => '<',
-            Direction::Right => '>',
-        }
-    }
-
     pub fn get_tail_char(&self) -> char {
         match self {
             Direction::Up | Direction::Down => '|',

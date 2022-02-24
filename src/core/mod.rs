@@ -8,6 +8,6 @@ mod walls;
 pub use apple::Apple;
 pub use position::Position;
 pub use scoreboard::Scoreboard;
-pub use snek::{DeathCause, Direction, Segment, SlitherResult, Snek};
+pub use snek::{DeathCause, Direction, Segment, SlitherAction, SlitherResult, Snek};
 pub use state::State;
 pub use walls::Walls;

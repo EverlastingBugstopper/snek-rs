@@ -7,33 +7,15 @@ pub struct Apple {
 
 impl Apple {
     #[tracing::instrument(level = "info")]
-    pub fn random(possible_positions: &[&Position]) -> Self {
-        // TODO: add random apple function
-        let x = 5;
-        let y = 5;
-        let position = Position::new(x, y);
-        if possible_positions.contains(&&position) {
-            Self {
-                position: Position::new(x, y),
-            }
-        } else {
-            panic!("can't create an apple here")
-        }
+    pub fn new(position: Position) -> Self {
+        Self { position }
     }
     #[tracing::instrument(level = "trace")]
     pub fn get_position(&self) -> Position {
         self.position
     }
 
-    pub fn new(x: usize, y: usize) -> Self {
-        Self {
-            position: Position::new(x, y),
-        }
-    }
-}
-
-impl Default for Apple {
-    fn default() -> Self {
-        Apple::new(5, 5)
+    pub fn will_be_eaten_by(&self, potential_head: &Position) -> bool {
+        potential_head == &self.get_position()
     }
 }
