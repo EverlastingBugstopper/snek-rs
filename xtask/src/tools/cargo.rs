@@ -36,10 +36,7 @@ impl CargoRunner {
     }
 
     pub(crate) fn test(&self) -> Result<()> {
-        self.cargo_exec(
-            vec!["nextest", "run", "--workspace", "--locked", "--nocapture"],
-            vec![],
-        )?;
+        self.cargo_exec(vec!["nextest", "run", "--workspace", "--locked"], vec![])?;
         Ok(())
     }
 

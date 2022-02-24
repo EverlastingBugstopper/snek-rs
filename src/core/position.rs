@@ -1,6 +1,6 @@
-use crate::core::{DeathCause, Direction};
+use crate::core::Direction;
 
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
 pub struct Position {
     x: usize,
     y: usize,
@@ -11,25 +11,43 @@ impl Position {
         Self { x, y }
     }
 
-    pub fn nudge(&mut self, direction: Direction) -> Option<DeathCause> {
+    /// gets the neighboring position
+    /// iff it is a valid position.
+    /// if the computed neighbor would result
+    /// in a negative position, there is no neighbor
+    pub fn neighbor(&self, direction: Direction) -> Option<Position> {
         match direction {
             Direction::Up => {
                 if self.y == 0 {
-                    return Some(DeathCause::Wall);
+                    None
+                } else {
+                    Some(Position::new(self.x, self.y - 1))
                 }
-                self.y -= 1
             }
-            Direction::Down => self.y += 1,
-            Direction::Right => self.x += 1,
+            Direction::Down => Some(Position::new(self.x, self.y + 1)),
             Direction::Left => {
-                if self.y == 0 {
-                    return Some(DeathCause::Wall);
+                if self.x == 0 {
+                    None
+                } else {
+                    Some(Position::new(self.x - 1, self.y))
                 }
-                self.x -= 1
             }
+            Direction::Right => Some(Position::new(self.x + 1, self.y)),
         }
-        None
     }
+
+    pub fn set(&mut self, position: Position) {
+        *self = position;
+    }
+
+    pub fn set_x(&mut self, x: usize) {
+        self.x = x;
+    }
+
+    pub fn set_y(&mut self, y: usize) {
+        self.y = y;
+    }
+
     pub fn get_coordinates(&self) -> (usize, usize) {
         (self.x, self.y)
     }
@@ -40,34 +58,49 @@ mod tests {
     use super::*;
 
     #[test]
+    fn it_knows_negatives_are_not_the_answer() {
+        let position = Position::new(0, 0);
+        assert!(position.neighbor(Direction::Up).is_none());
+        assert!(position.neighbor(Direction::Left).is_none());
+    }
+
+    #[test]
     fn it_can_nudge_left() {
-        let mut position = Position::new(10, 10);
-        assert_eq!((10, 10), position.get_coordinates());
-        position.nudge(Direction::Left);
-        assert_eq!((9, 10), position.get_coordinates());
+        let mut old_position = Position::new(10, 10);
+        assert_eq!((10, 10), old_position.get_coordinates());
+        let new_position = old_position.neighbor(Direction::Left).unwrap();
+        assert_eq!((9, 10), new_position.get_coordinates());
+        old_position.set(new_position);
+        assert_eq!((9, 10), old_position.get_coordinates());
     }
 
     #[test]
     fn it_can_nudge_right() {
-        let mut position = Position::new(10, 10);
-        assert_eq!((10, 10), position.get_coordinates());
-        position.nudge(Direction::Right);
-        assert_eq!((11, 10), position.get_coordinates());
+        let mut old_position = Position::new(10, 10);
+        assert_eq!((10, 10), old_position.get_coordinates());
+        let new_position = old_position.neighbor(Direction::Right).unwrap();
+        assert_eq!((11, 10), new_position.get_coordinates());
+        old_position.set(new_position);
+        assert_eq!((11, 10), old_position.get_coordinates());
     }
 
     #[test]
     fn it_can_nudge_down() {
-        let mut position = Position::new(10, 10);
-        assert_eq!((10, 10), position.get_coordinates());
-        position.nudge(Direction::Down);
-        assert_eq!((10, 11), position.get_coordinates());
+        let mut old_position = Position::new(10, 10);
+        assert_eq!((10, 10), old_position.get_coordinates());
+        let new_position = old_position.neighbor(Direction::Down).unwrap();
+        assert_eq!((10, 11), new_position.get_coordinates());
+        old_position.set(new_position);
+        assert_eq!((10, 11), old_position.get_coordinates());
     }
 
     #[test]
-    fn it_an_nudge_up() {
-        let mut position = Position::new(10, 10);
-        assert_eq!((10, 10), position.get_coordinates());
-        position.nudge(Direction::Up);
-        assert_eq!((10, 9), position.get_coordinates());
+    fn it_can_nudge_up() {
+        let mut old_position = Position::new(10, 10);
+        assert_eq!((10, 10), old_position.get_coordinates());
+        let new_position = old_position.neighbor(Direction::Up).unwrap();
+        assert_eq!((10, 9), new_position.get_coordinates());
+        old_position.set(new_position);
+        assert_eq!((10, 9), old_position.get_coordinates());
     }
 }
