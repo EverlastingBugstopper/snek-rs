@@ -4,6 +4,7 @@ use crate::core::{Direction, Position};
 pub struct Segment {
     position: Position,
     direction: Direction,
+    segment_type: SegmentType,
     head: bool,
 }
 
@@ -13,6 +14,7 @@ impl Segment {
             position,
             direction,
             head: true,
+            segment_type: SegmentType::from(direction),
         }
     }
 
@@ -21,6 +23,7 @@ impl Segment {
             position,
             direction,
             head: false,
+            segment_type: SegmentType::from(direction),
         }
     }
 
@@ -49,16 +52,26 @@ impl Segment {
     }
 
     pub fn set_direction(&mut self, direction: &Direction) {
+        self.segment_type = match (self.direction, direction) {
+            (Direction::Left, Direction::Down) | (Direction::Up, Direction::Right) => {
+                SegmentType::LeftDownSegment
+            }
+            (Direction::Left, Direction::Up) | (Direction::Down, Direction::Right) => {
+                SegmentType::LeftUpSegment
+            }
+            (Direction::Right, Direction::Down) | (Direction::Up, Direction::Left) => {
+                SegmentType::RightDownSegment
+            }
+            (Direction::Right, Direction::Up) | (Direction::Down, Direction::Left) => {
+                SegmentType::RightUpSegment
+            }
+            (_, direction) => SegmentType::from(*direction),
+        };
         self.direction = *direction;
     }
 
     pub fn opposite_neighbor(&self, direction: &Direction) -> Option<Position> {
-        match direction {
-            Direction::Up => self.position.neighbor(Direction::Down),
-            Direction::Down => self.position.neighbor(Direction::Up),
-            Direction::Left => self.position.neighbor(Direction::Right),
-            Direction::Right => self.position.neighbor(Direction::Left),
-        }
+        self.position.neighbor(direction.opposite())
     }
 
     pub fn display(&self) -> &str {
@@ -70,10 +83,37 @@ impl Segment {
                 Direction::Right => ">",
             }
         } else {
-            match self.direction {
-                Direction::Down | Direction::Up => "|",
-                Direction::Left | Direction::Right => "-",
+            match self.segment_type {
+                SegmentType::DownSegment | SegmentType::UpSegment => "│",
+                SegmentType::LeftSegment | SegmentType::RightSegment => "──",
+                SegmentType::LeftDownSegment => "┌─",
+                SegmentType::LeftUpSegment => "└─",
+                SegmentType::RightDownSegment => "┐",
+                SegmentType::RightUpSegment => "┘",
             }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SegmentType {
+    LeftSegment,
+    RightSegment,
+    UpSegment,
+    DownSegment,
+    LeftUpSegment,
+    LeftDownSegment,
+    RightUpSegment,
+    RightDownSegment,
+}
+
+impl From<Direction> for SegmentType {
+    fn from(d: Direction) -> SegmentType {
+        match d {
+            Direction::Down => SegmentType::DownSegment,
+            Direction::Up => SegmentType::UpSegment,
+            Direction::Left => SegmentType::LeftSegment,
+            Direction::Right => SegmentType::RightSegment,
         }
     }
 }

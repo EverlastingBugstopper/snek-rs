@@ -27,7 +27,7 @@ impl SlitherResult {
     pub fn describe(&self) -> String {
         match self {
             SlitherResult::Died(death_cause) => {
-                format!("snek died because it {}", death_cause.describe())
+                format!("snek died because {}", death_cause.describe())
             }
             SlitherResult::Grew {
                 direction,

@@ -3,7 +3,12 @@ use snek_rs::tui::Tui;
 use tracing::Level;
 use tracing_subscriber::fmt::format::FmtSpan;
 
+use std::panic;
+
 fn main() {
+    panic::set_hook(Box::new(|e| {
+        tracing::info!("panicked:\n{:?}", e);
+    }));
     let current_dir = std::env::current_dir().unwrap();
     let log_file = "tui-snek.log";
     let file_appender = tracing_appender::rolling::never(current_dir, log_file);

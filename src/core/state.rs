@@ -98,19 +98,8 @@ impl State {
     }
     #[tracing::instrument(level = "info")]
     pub fn turn_snek(&mut self, attempted_direction: Direction) -> bool {
-        // check the head's current direction
-        let can_turn = match self.snek.get_head().get_direction() {
-            // if you're going right or left
-            Direction::Right | Direction::Left => {
-                // you can turn up or down
-                attempted_direction == Direction::Up || attempted_direction == Direction::Down
-            }
-            // if you're going up or down
-            Direction::Up | Direction::Down => {
-                // you can turn left or right
-                attempted_direction == Direction::Left || attempted_direction == Direction::Right
-            }
-        };
+        // make sure the snek isn't trying to do a 180 back in on itself
+        let can_turn = !attempted_direction.is_on_a_dime(&self.snek.get_head().get_direction());
         if can_turn {
             // update the snek's _overall_ direction
             // this will only update the heads direction in Snek::grow
@@ -121,7 +110,7 @@ impl State {
         can_turn
     }
 
-    fn take_slither_action(&mut self, slither_action: &SlitherAction) -> SlitherResult {
+    pub(crate) fn take_slither_action(&mut self, slither_action: &SlitherAction) -> SlitherResult {
         match slither_action {
             SlitherAction::Die(death_cause) => {
                 self.snek.kill();
@@ -175,6 +164,10 @@ impl State {
     #[tracing::instrument(level = "trace")]
     pub fn get_walls(&self) -> &Walls {
         &self.walls
+    }
+
+    pub fn get_walls_mut(&mut self) -> &mut Walls {
+        &mut self.walls
     }
 
     #[tracing::instrument(level = "trace")]
@@ -416,10 +409,10 @@ mod tests {
     }
 
     #[test]
-    fn snek_cant_turn_from_up_to_up() {
+    fn snek_can_turn_from_up_to_up() {
         let mut state = direction_state(Direction::Up);
         assert_eq!(state.get_direction(), Direction::Up);
-        assert!(!state.turn_snek(Direction::Up));
+        assert!(state.turn_snek(Direction::Up));
         state.tick();
         assert_eq!(state.get_direction(), Direction::Up);
     }
@@ -443,10 +436,10 @@ mod tests {
     }
 
     #[test]
-    fn snek_cant_turn_from_down_to_down() {
+    fn snek_can_turn_from_down_to_down() {
         let mut state = direction_state(Direction::Down);
         assert_eq!(state.get_direction(), Direction::Down);
-        assert!(!state.turn_snek(Direction::Down));
+        assert!(state.turn_snek(Direction::Down));
         state.tick();
         assert_eq!(state.get_direction(), Direction::Down);
     }
@@ -479,10 +472,10 @@ mod tests {
     }
 
     #[test]
-    fn snek_cant_turn_from_right_to_right() {
+    fn snek_can_turn_from_right_to_right() {
         let mut state = direction_state(Direction::Right);
         assert_eq!(state.get_direction(), Direction::Right);
-        assert!(!state.turn_snek(Direction::Right));
+        assert!(state.turn_snek(Direction::Right));
         state.tick();
         assert_eq!(state.get_direction(), Direction::Right);
     }
@@ -515,10 +508,10 @@ mod tests {
     }
 
     #[test]
-    fn snek_cant_turn_from_left_to_left() {
+    fn snek_can_turn_from_left_to_left() {
         let mut state = direction_state(Direction::Left);
         assert_eq!(state.get_direction(), Direction::Left);
-        assert!(!state.turn_snek(Direction::Left));
+        assert!(state.turn_snek(Direction::Left));
         state.tick();
         assert_eq!(state.get_direction(), Direction::Left);
     }

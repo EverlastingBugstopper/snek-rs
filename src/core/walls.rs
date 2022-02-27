@@ -43,8 +43,16 @@ impl Walls {
         self.height - 1
     }
 
+    pub(crate) fn set_bottom_wall(&mut self, height: usize) {
+        self.height = height - 1
+    }
+
     pub(crate) fn right_wall(&self) -> usize {
         self.width - 1
+    }
+
+    pub(crate) fn set_right_wall(&mut self, width: usize) {
+        self.width = width - 1
     }
 
     pub fn get_positions(&self) -> Vec<Position> {
@@ -57,6 +65,7 @@ impl Walls {
             positions.push(Position::new(self.left_wall(), y));
             positions.push(Position::new(self.right_wall(), y));
         }
+        tracing::info!("{:?}", &positions);
         positions
     }
 }
@@ -128,5 +137,65 @@ mod tests {
         assert!(walls.collides_with(&top_right_corner));
         assert!(walls.collides_with(&bottom_left_corner));
         assert!(walls.collides_with(&bottom_right_corner));
+    }
+
+    #[test]
+    fn walls_are_sized_correctly_when_wide() {
+        // [X,X,X,X,X,X]
+        // [X,o,o,o,o,X]
+        // [X,o,o,o,o,X]
+        // [X,X,X,X,X,X]
+        let walls = Walls::new(6, 4);
+        for x in 2..=4 {
+            for y in 1..=2 {
+                dbg!(x, y);
+                println!("\n");
+                assert!(walls.is_position_inside(&Position::new(x, y)));
+                assert!(!walls.collides_with(&Position::new(x, y)));
+            }
+        }
+        for x in 0..=6 {
+            assert!(!walls.is_position_inside(&Position::new(x, 0)));
+            assert!(walls.collides_with(&Position::new(x, 0)));
+            assert!(!walls.is_position_inside(&Position::new(x, 3)));
+            assert!(walls.collides_with(&Position::new(x, 3)));
+        }
+        for y in 0..=4 {
+            assert!(!walls.is_position_inside(&Position::new(0, y)));
+            assert!(walls.collides_with(&Position::new(0, y)));
+            assert!(!walls.is_position_inside(&Position::new(5, y)));
+            assert!(walls.collides_with(&Position::new(5, y)));
+        }
+    }
+
+    #[test]
+    fn walls_are_sized_correctly_when_tall() {
+        // [X,X,X,X]
+        // [X,o,o,X]
+        // [X,o,o,X]
+        // [X,o,o,X]
+        // [X,o,o,X]
+        // [X,X,X,X]
+        let walls = Walls::new(4, 6);
+        for x in 1..=2 {
+            for y in 2..=4 {
+                dbg!(x, y);
+                println!("\n");
+                assert!(walls.is_position_inside(&Position::new(x, y)));
+                assert!(!walls.collides_with(&Position::new(x, y)));
+            }
+        }
+        for x in 0..=4 {
+            assert!(!walls.is_position_inside(&Position::new(x, 0)));
+            assert!(walls.collides_with(&Position::new(x, 0)));
+            assert!(!walls.is_position_inside(&Position::new(x, 5)));
+            assert!(walls.collides_with(&Position::new(x, 5)));
+        }
+        for y in 0..=6 {
+            assert!(!walls.is_position_inside(&Position::new(0, y)));
+            assert!(walls.collides_with(&Position::new(0, y)));
+            assert!(!walls.is_position_inside(&Position::new(3, y)));
+            assert!(walls.collides_with(&Position::new(3, y)));
+        }
     }
 }
