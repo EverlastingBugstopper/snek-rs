@@ -24,7 +24,7 @@ impl Direction {
     }
 
     pub fn is_on_a_dime(&self, attempted_direction: &Direction) -> bool {
-        self.opposite().eq(&attempted_direction)
+        self.opposite().eq(attempted_direction)
     }
 
     pub fn opposite(&self) -> Direction {

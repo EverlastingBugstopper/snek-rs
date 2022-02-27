@@ -43,16 +43,8 @@ impl Walls {
         self.height - 1
     }
 
-    pub(crate) fn set_bottom_wall(&mut self, height: usize) {
-        self.height = height - 1
-    }
-
     pub(crate) fn right_wall(&self) -> usize {
         self.width - 1
-    }
-
-    pub(crate) fn set_right_wall(&mut self, width: usize) {
-        self.width = width - 1
     }
 
     pub fn get_positions(&self) -> Vec<Position> {
