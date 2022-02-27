@@ -86,7 +86,14 @@ ssslither ~~~> wasssd
         let old_apple = self.state.get_apple().get_position();
         let slither_result = self.state.tick();
         match slither_result {
-            SlitherResult::Died(death_cause) => self.die_alog(death_cause),
+            SlitherResult::Died(death_cause) => {
+                self.state
+                    .get_snek()
+                    .get_segments()
+                    .iter()
+                    .for_each(|s| self.draw_segment(s));
+                self.die_alog(death_cause)
+            }
             SlitherResult::AteTheWorld => EventResult::with_cb(|s| {
                 s.set_autorefresh(false);
                 s.add_layer(Dialog::text("snek ate the world!").button("Ok", |s| {
@@ -148,7 +155,6 @@ ssslither ~~~> wasssd
     fn die_alog(&mut self, death_cause: DeathCause) -> EventResult {
         let text = death_cause.describe().to_string();
         EventResult::with_cb(move |s| {
-            s.set_autorefresh(false);
             s.add_layer(
                 Dialog::text(&text)
                     .button("play again", |s| {
@@ -158,6 +164,7 @@ ssslither ~~~> wasssd
                     })
                     .button("quit", |s| s.quit()),
             );
+            s.set_autorefresh(false);
         })
     }
 
@@ -240,9 +247,12 @@ impl View for BoardView {
             .enumerate()
             .for_each_with(sender, |sender, (i, cell)| {
                 let position = self.get_position_from_cell_idx(i);
-                sender
-                    .send((position.get_coordinates(), cell.display()))
-                    .unwrap();
+                if let Cell::Free = cell {
+                } else {
+                    sender
+                        .send((position.get_coordinates(), cell.display()))
+                        .unwrap();
+                }
             });
         receiver.iter().for_each(|((x, y), text)| {
             printer.print((x + self.offset, y), &text);
@@ -305,15 +315,15 @@ impl Cell {
             Cell::Snek(segment) => segment.display().to_string(),
             Cell::Apple(_) => "🍎".to_string(),
             Cell::Wall(wall_type) => match wall_type {
-                WallType::TopLeftCorner => "┌─",
-                WallType::BottomLeftCorner => "└─",
-                WallType::BottomRightCorner => "┘",
-                WallType::TopRightCorner => "┐",
+                WallType::TopLeftCorner => "╭─",
+                WallType::BottomLeftCorner => "╰─",
+                WallType::BottomRightCorner => "╯",
+                WallType::TopRightCorner => "╮",
                 WallType::TopWall | WallType::BottomWall => "──",
                 WallType::LeftWall | WallType::RightWall => "│",
             }
             .to_string(),
-            Cell::Free => " ".to_string(),
+            Cell::Free => "  ".to_string(),
         }
     }
 }

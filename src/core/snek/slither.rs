@@ -2,7 +2,10 @@ use crate::core::{DeathCause, Direction, Position, Segment};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SlitherAction {
-    Die(DeathCause),
+    Die {
+        cause: DeathCause,
+        direction: Direction,
+    },
     Grow(Direction),
     Slither(Direction),
 }

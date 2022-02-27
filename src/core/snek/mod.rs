@@ -129,6 +129,7 @@ impl Snek {
     }
 
     pub(crate) fn kill(&mut self) {
+        self.get_head_mut().dead_head();
         self.alive = false;
     }
 }

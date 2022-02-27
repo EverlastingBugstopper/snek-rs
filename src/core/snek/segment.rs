@@ -35,6 +35,10 @@ impl Segment {
         self.head
     }
 
+    pub fn dead_head(&mut self) {
+        self.segment_type = SegmentType::DeadHead;
+    }
+
     pub fn is_tail(&self) -> bool {
         !self.head
     }
@@ -54,16 +58,16 @@ impl Segment {
     pub fn set_direction(&mut self, direction: &Direction) {
         self.segment_type = match (self.direction, direction) {
             (Direction::Left, Direction::Down) | (Direction::Up, Direction::Right) => {
-                SegmentType::LeftDownSegment
+                SegmentType::TopLeftSegment
             }
             (Direction::Left, Direction::Up) | (Direction::Down, Direction::Right) => {
-                SegmentType::LeftUpSegment
+                SegmentType::BottomLeftSegment
             }
             (Direction::Right, Direction::Down) | (Direction::Up, Direction::Left) => {
-                SegmentType::RightDownSegment
+                SegmentType::TopRightSegment
             }
             (Direction::Right, Direction::Up) | (Direction::Down, Direction::Left) => {
-                SegmentType::RightUpSegment
+                SegmentType::BottomRightSegment
             }
             (_, direction) => SegmentType::from(*direction),
         };
@@ -76,20 +80,25 @@ impl Segment {
 
     pub fn display(&self) -> &str {
         if self.is_head() {
-            match self.direction {
-                Direction::Up => "^",
-                Direction::Down => "v",
-                Direction::Left => "<",
-                Direction::Right => ">",
+            if let SegmentType::DeadHead = self.segment_type {
+                "💀"
+            } else {
+                match self.direction {
+                    Direction::Up => "△",
+                    Direction::Down => "▽",
+                    Direction::Left => "◁",
+                    Direction::Right => " ▷",
+                }
             }
         } else {
             match self.segment_type {
                 SegmentType::DownSegment | SegmentType::UpSegment => "│",
                 SegmentType::LeftSegment | SegmentType::RightSegment => "──",
-                SegmentType::LeftDownSegment => "┌─",
-                SegmentType::LeftUpSegment => "└─",
-                SegmentType::RightDownSegment => "┐",
-                SegmentType::RightUpSegment => "┘",
+                SegmentType::TopLeftSegment => "╭─",
+                SegmentType::BottomLeftSegment => "╰─",
+                SegmentType::TopRightSegment => "╮",
+                SegmentType::BottomRightSegment => "╯",
+                _ => "",
             }
         }
     }
@@ -97,14 +106,15 @@ impl Segment {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SegmentType {
+    DeadHead,
     LeftSegment,
     RightSegment,
     UpSegment,
     DownSegment,
-    LeftUpSegment,
-    LeftDownSegment,
-    RightUpSegment,
-    RightDownSegment,
+    BottomLeftSegment,
+    TopLeftSegment,
+    BottomRightSegment,
+    TopRightSegment,
 }
 
 impl From<Direction> for SegmentType {

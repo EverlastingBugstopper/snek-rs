@@ -80,20 +80,32 @@ impl State {
             .neighbor(self.get_direction())
         {
             if self.walls.collides_with(&potential_head) {
-                SlitherAction::Die(DeathCause::Wall)
+                SlitherAction::Die {
+                    cause: DeathCause::Wall,
+                    direction: self.get_direction(),
+                }
             } else if self.apple.will_be_eaten_by(&potential_head) {
                 if self.snek.will_i_run_into_myssself(&potential_head, true) {
-                    SlitherAction::Die(DeathCause::Tail)
+                    SlitherAction::Die {
+                        cause: DeathCause::Tail,
+                        direction: self.get_direction(),
+                    }
                 } else {
                     SlitherAction::Grow(self.get_direction())
                 }
             } else if self.snek.will_i_run_into_myssself(&potential_head, false) {
-                SlitherAction::Die(DeathCause::Tail)
+                SlitherAction::Die {
+                    cause: DeathCause::Tail,
+                    direction: self.get_direction(),
+                }
             } else {
                 SlitherAction::Slither(self.get_direction())
             }
         } else {
-            SlitherAction::Die(DeathCause::Wall)
+            SlitherAction::Die {
+                cause: DeathCause::Wall,
+                direction: self.get_direction(),
+            }
         }
     }
     #[tracing::instrument(level = "info")]
@@ -112,10 +124,11 @@ impl State {
 
     pub(crate) fn take_slither_action(&mut self, slither_action: &SlitherAction) -> SlitherResult {
         match slither_action {
-            SlitherAction::Die(death_cause) => {
+            SlitherAction::Die { cause, direction } => {
+                self.take_slither_action(&SlitherAction::Slither(*direction));
                 self.snek.kill();
                 tracing::info!("snek died");
-                SlitherResult::Died(*death_cause)
+                SlitherResult::Died(*cause)
             }
             SlitherAction::Grow(direction) => {
                 let slime_trail = self.snek.get_segments().first().unwrap().get_position();
