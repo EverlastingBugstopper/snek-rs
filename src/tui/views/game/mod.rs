@@ -1,4 +1,4 @@
-use crate::core::{Apple, DeathCause, Direction, Position, Segment, SlitherResult, State};
+use crate::core::{Apple, DeathCause, Direction, Position, Segment, SlitherResultType, State};
 
 use crossbeam_channel::unbounded;
 
@@ -85,16 +85,18 @@ ssslither ~~~> wasssd
     fn tick(&mut self) -> EventResult {
         let old_apple = self.state.get_apple().get_position();
         let slither_result = self.state.tick();
-        match slither_result {
-            SlitherResult::Died(death_cause) => {
-                self.state
-                    .get_snek()
-                    .get_segments()
-                    .iter()
-                    .for_each(|s| self.draw_segment(s));
-                self.die_alog(death_cause)
-            }
-            SlitherResult::AteTheWorld => EventResult::with_cb(|s| {
+        if let Some(slime_trail) = slither_result.get_slime_trail() {
+            self.free_cell(slime_trail);
+        }
+        self.update_apple(Some(old_apple));
+        self.state
+            .get_snek()
+            .get_segments()
+            .iter()
+            .for_each(|s| self.draw_segment(s));
+        match slither_result.get_type() {
+            SlitherResultType::Died { death_cause } => self.die_alog(death_cause),
+            SlitherResultType::AteTheWorld => EventResult::with_cb(|s| {
                 s.set_autorefresh(false);
                 s.add_layer(Dialog::text("snek ate the world!").button("Ok", |s| {
                     s.pop_layer();
@@ -102,30 +104,14 @@ ssslither ~~~> wasssd
                     new_game(s);
                 }));
             }),
-            SlitherResult::Grew {
-                direction: _,
-                segments,
-                slime_trail,
-            } => {
-                self.free_cell(slime_trail);
-                self.update_apple(Some(old_apple));
-                segments.iter().for_each(|s| self.draw_segment(s));
+            SlitherResultType::Grew => {
                 let score_content = self.get_score_content();
                 EventResult::with_cb(move |s| {
                     let mut score_view: ViewRef<TextView> = s.find_name("score").unwrap();
                     score_view.set_content(&score_content);
                 })
             }
-            SlitherResult::Slithered {
-                direction: _,
-                segments,
-                slime_trail,
-            } => {
-                self.free_cell(slime_trail);
-                self.update_apple(Some(old_apple));
-                segments.iter().for_each(|s| self.draw_segment(s));
-                EventResult::Consumed(None)
-            }
+            SlitherResultType::Slithered => EventResult::Consumed(None),
         }
     }
 
@@ -247,6 +233,9 @@ impl View for BoardView {
             .enumerate()
             .for_each_with(sender, |sender, (i, cell)| {
                 let position = self.get_position_from_cell_idx(i);
+                if let Cell::Snek(segment) = cell {
+                    tracing::info!("{}", segment.display());
+                }
                 if let Cell::Free = cell {
                 } else {
                     sender

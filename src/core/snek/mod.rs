@@ -6,7 +6,7 @@ mod slither;
 pub use death::DeathCause;
 pub use direction::Direction;
 pub use segment::Segment;
-pub use slither::{SlitherAction, SlitherResult};
+pub use slither::{SlitherAction, SlitherResult, SlitherResultType};
 
 use crate::core::Position;
 
@@ -106,11 +106,12 @@ impl Snek {
     }
 
     /// slithers the snek in a direction
-    /// returning the new head location
-    /// and where the old head used to be
-    pub fn slither(&mut self, direction: &Direction) {
+    /// returning the slime trail position
+    pub fn slither(&mut self, direction: &Direction) -> Position {
         self.grow(direction);
+        let slime_trail = *self.segments.first().unwrap();
         self.segments.remove(0);
+        slime_trail.get_position()
     }
 
     pub(crate) fn will_i_run_into_myssself(

@@ -22,9 +22,9 @@ impl State {
         let walls = Walls::new(width, height);
         let scoreboard = Scoreboard::new();
         let direction = Direction::Right;
-        // let snek = Snek::line_snek(Position::new(1, 1), Direction::Right, 2);
         let snek = Snek::default();
-        // dummy apple
+        // dummy apple, we redraw on restart so the apple will be randomized later
+        // this is used for testing though.
         let apple = Apple::new(Position::new(2, 1));
         let mut state = State {
             apple,
@@ -81,13 +81,13 @@ impl State {
         {
             if self.walls.collides_with(&potential_head) {
                 SlitherAction::Die {
-                    cause: DeathCause::Wall,
+                    death_cause: DeathCause::Wall,
                     direction: self.get_direction(),
                 }
             } else if self.apple.will_be_eaten_by(&potential_head) {
                 if self.snek.will_i_run_into_myssself(&potential_head, true) {
                     SlitherAction::Die {
-                        cause: DeathCause::Tail,
+                        death_cause: DeathCause::Tail,
                         direction: self.get_direction(),
                     }
                 } else {
@@ -95,7 +95,7 @@ impl State {
                 }
             } else if self.snek.will_i_run_into_myssself(&potential_head, false) {
                 SlitherAction::Die {
-                    cause: DeathCause::Tail,
+                    death_cause: DeathCause::Tail,
                     direction: self.get_direction(),
                 }
             } else {
@@ -103,7 +103,7 @@ impl State {
             }
         } else {
             SlitherAction::Die {
-                cause: DeathCause::Wall,
+                death_cause: DeathCause::Wall,
                 direction: self.get_direction(),
             }
         }
@@ -124,37 +124,30 @@ impl State {
 
     pub(crate) fn take_slither_action(&mut self, slither_action: &SlitherAction) -> SlitherResult {
         match slither_action {
-            SlitherAction::Die { cause, direction } => {
-                self.take_slither_action(&SlitherAction::Slither(*direction));
+            SlitherAction::Die {
+                death_cause,
+                direction,
+            } => {
+                let slime_trail = self.snek.slither(direction);
                 self.snek.kill();
                 tracing::info!("snek died");
-                SlitherResult::Died(*cause)
+                SlitherResult::died(direction, slime_trail, death_cause)
             }
             SlitherAction::Grow(direction) => {
-                let slime_trail = self.snek.get_segments().first().unwrap().get_position();
                 self.snek.grow(direction);
                 self.scoreboard.increment_score();
                 tracing::info!("ate an apple, new score: {}", self.scoreboard.get_score());
                 if self.snek.count_segments() == self.walls.get_max_segments() {
-                    SlitherResult::AteTheWorld
+                    SlitherResult::ate_the_world(direction)
                 } else {
                     self.new_apple();
-                    SlitherResult::Grew {
-                        direction: *direction,
-                        segments: self.snek.get_segments(),
-                        slime_trail,
-                    }
+                    SlitherResult::grew(direction)
                 }
             }
             SlitherAction::Slither(direction) => {
-                let slime_trail = self.snek.get_segments().first().unwrap().get_position();
-                self.snek.slither(direction);
+                let slime_trail = self.snek.slither(direction);
                 tracing::info!("slithered {:?}", direction);
-                SlitherResult::Slithered {
-                    direction: *direction,
-                    segments: self.get_snek().get_segments(),
-                    slime_trail,
-                }
+                SlitherResult::slithered(direction, slime_trail)
             }
         }
     }
@@ -197,7 +190,7 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{DeathCause, Position};
+    use crate::core::{DeathCause, Position, SlitherResultType};
 
     #[test]
     fn it_can_eat_an_apple() {
@@ -209,7 +202,7 @@ mod tests {
         assert_eq!(state.get_snek().count_segments(), 1);
 
         // tick the game forward
-        assert_eq!(state.tick().get_direction().unwrap(), Direction::Right);
+        assert_eq!(state.tick().get_direction(), Direction::Right);
         assert_eq!(state.get_snek().count_segments(), 2);
         assert_eq!(state.get_score(), 1);
     }
@@ -222,9 +215,9 @@ mod tests {
         assert_eq!(state.get_score(), 0);
         assert_eq!(state.get_direction(), Direction::Right);
         assert_eq!(state.get_snek().count_segments(), 1);
-        assert_eq!(state.tick().get_direction().unwrap(), Direction::Right);
+        assert_eq!(state.tick().get_direction(), Direction::Right);
         assert!(state.turn_snek(Direction::Down));
-        assert_eq!(state.tick().get_direction().unwrap(), Direction::Down);
+        assert_eq!(state.tick().get_direction(), Direction::Down);
         assert_eq!(state.get_snek().count_segments(), 2);
         assert_eq!(state.get_score(), 1);
     }
@@ -238,7 +231,7 @@ mod tests {
         assert_eq!(state.get_snek().count_segments(), 1);
 
         // tick the game forward
-        assert_eq!(state.tick().get_direction().unwrap(), Direction::Right);
+        assert_eq!(state.tick().get_direction(), Direction::Right);
 
         // turn down
         assert!(state.turn_snek(Direction::Down));
@@ -247,7 +240,7 @@ mod tests {
         assert!(!state.turn_snek(Direction::Left));
 
         // tick the game forward, we should continue down since we couldn't turn left earlier
-        assert_eq!(state.tick().get_direction().unwrap(), Direction::Down);
+        assert_eq!(state.tick().get_direction(), Direction::Down);
 
         // now we can turn left
         assert!(state.turn_snek(Direction::Left));
@@ -263,7 +256,7 @@ mod tests {
         assert_eq!(state.get_snek().count_segments(), 1);
 
         // tick the game forward
-        assert_eq!(state.tick().get_direction().unwrap(), Direction::Right);
+        assert_eq!(state.tick().get_direction(), Direction::Right);
         assert_eq!(state.get_score(), 1);
         assert_eq!(state.get_direction(), Direction::Right);
         assert_eq!(state.get_snek().count_segments(), 2);
@@ -272,7 +265,7 @@ mod tests {
         state.plant_apple(2, 2);
         // turn towards the apple
         assert!(state.turn_snek(Direction::Down));
-        assert_eq!(state.tick().get_direction().unwrap(), Direction::Down);
+        assert_eq!(state.tick().get_direction(), Direction::Down);
         assert_eq!(state.get_score(), 2);
         assert_eq!(state.get_direction(), Direction::Down);
         assert_eq!(state.get_snek().count_segments(), 3);
@@ -280,7 +273,7 @@ mod tests {
         state.plant_apple(1, 2);
         // turn towards the apple
         assert!(state.turn_snek(Direction::Left));
-        assert_eq!(state.tick(), SlitherResult::AteTheWorld);
+        assert_eq!(state.tick().get_type(), SlitherResultType::AteTheWorld);
         assert_eq!(state.get_score(), 3);
         assert_eq!(state.get_direction(), Direction::Left);
         assert_eq!(state.get_snek().count_segments(), 4);
@@ -303,7 +296,12 @@ mod tests {
     fn it_can_die_by_hitting_top_wall() {
         let mut state = State::new(4, 4);
         assert!(state.turn_snek(Direction::Up));
-        assert_eq!(state.tick(), SlitherResult::Died(DeathCause::Wall));
+        assert_eq!(
+            state.tick().get_type(),
+            SlitherResultType::Died {
+                death_cause: DeathCause::Wall,
+            }
+        );
         assert!(!state.get_snek().is_alive())
     }
 
@@ -311,8 +309,13 @@ mod tests {
     fn it_can_die_by_hitting_bottom_wall() {
         let mut state = State::new(4, 4);
         assert!(state.turn_snek(Direction::Down));
-        assert_eq!(state.tick().get_direction().unwrap(), Direction::Down);
-        assert_eq!(state.tick(), SlitherResult::Died(DeathCause::Wall));
+        assert_eq!(state.tick().get_direction(), Direction::Down);
+        assert_eq!(
+            state.tick().get_type(),
+            SlitherResultType::Died {
+                death_cause: DeathCause::Wall,
+            }
+        );
         assert!(!state.get_snek().is_alive())
     }
 
@@ -320,17 +323,27 @@ mod tests {
     fn it_can_die_by_hitting_left_wall() {
         let mut state = State::new(4, 4);
         assert!(state.turn_snek(Direction::Down));
-        assert_eq!(state.tick().get_direction().unwrap(), Direction::Down);
+        assert_eq!(state.tick().get_direction(), Direction::Down);
         assert!(state.turn_snek(Direction::Left));
-        assert_eq!(state.tick(), SlitherResult::Died(DeathCause::Wall));
+        assert_eq!(
+            state.tick().get_type(),
+            SlitherResultType::Died {
+                death_cause: DeathCause::Wall,
+            }
+        );
         assert!(!state.get_snek().is_alive())
     }
 
     #[test]
     fn it_can_die_by_hitting_right_wall() {
         let mut state = State::new(4, 4);
-        assert_eq!(state.tick().get_direction().unwrap(), Direction::Right);
-        assert_eq!(state.tick(), SlitherResult::Died(DeathCause::Wall));
+        assert_eq!(state.tick().get_direction(), Direction::Right);
+        assert_eq!(
+            state.tick().get_type(),
+            SlitherResultType::Died {
+                death_cause: DeathCause::Wall,
+            }
+        );
         assert!(!state.get_snek().is_alive())
     }
 
@@ -339,28 +352,28 @@ mod tests {
         let mut state = State::new(5, 5);
         // plant an apple to the right of the default snek
         state.plant_apple(2, 1);
-        assert_eq!(state.tick().get_direction().unwrap(), Direction::Right);
+        assert_eq!(state.tick().get_direction(), Direction::Right);
         assert_eq!(state.get_score(), 1);
         assert_eq!(state.get_snek().count_segments(), 2);
 
         state.plant_apple(3, 1);
-        assert_eq!(state.tick().get_direction().unwrap(), Direction::Right);
+        assert_eq!(state.tick().get_direction(), Direction::Right);
         assert_eq!(state.get_snek().count_segments(), 3);
 
         state.plant_apple(3, 2);
         assert!(state.turn_snek(Direction::Down));
-        assert_eq!(state.tick().get_direction().unwrap(), Direction::Down);
+        assert_eq!(state.tick().get_direction(), Direction::Down);
         assert_eq!(state.get_score(), 3);
         assert_eq!(state.get_snek().count_segments(), 4);
 
         state.plant_apple(2, 2);
         assert!(state.turn_snek(Direction::Left));
-        assert_eq!(state.tick().get_direction().unwrap(), Direction::Left);
+        assert_eq!(state.tick().get_direction(), Direction::Left);
         assert_eq!(state.get_score(), 4);
         assert_eq!(state.get_snek().count_segments(), 5);
 
         state.plant_apple(1, 2);
-        assert_eq!(state.tick().get_direction().unwrap(), Direction::Left);
+        assert_eq!(state.tick().get_direction(), Direction::Left);
         assert_eq!(state.get_score(), 5);
         assert_eq!(state.get_snek().count_segments(), 6);
 
@@ -383,7 +396,12 @@ mod tests {
                 .get_position(),
             Position::new(1, 1)
         );
-        assert_eq!(state.tick(), SlitherResult::Died(DeathCause::Tail));
+        assert_eq!(
+            state.tick().get_type(),
+            SlitherResultType::Died {
+                death_cause: DeathCause::Tail,
+            }
+        );
         assert!(!state.get_snek().is_alive())
     }
 

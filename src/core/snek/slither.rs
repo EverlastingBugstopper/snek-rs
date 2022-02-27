@@ -1,9 +1,9 @@
-use crate::core::{DeathCause, Direction, Position, Segment};
+use crate::core::{DeathCause, Direction, Position};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SlitherAction {
     Die {
-        cause: DeathCause,
+        death_cause: DeathCause,
         direction: Direction,
     },
     Grow(Direction),
@@ -11,64 +11,81 @@ pub enum SlitherAction {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum SlitherResult {
-    Died(DeathCause),
-    Grew {
-        direction: Direction,
-        segments: Vec<Segment>,
-        slime_trail: Position,
-    },
-    Slithered {
-        direction: Direction,
-        segments: Vec<Segment>,
-        slime_trail: Position,
-    },
-    AteTheWorld,
+pub struct SlitherResult {
+    direction: Direction,
+    result_type: SlitherResultType,
+    slime_trail: Option<Position>,
 }
 
 impl SlitherResult {
-    pub fn describe(&self) -> String {
-        match self {
-            SlitherResult::Died(death_cause) => {
-                format!("snek died because {}", death_cause.describe())
-            }
-            SlitherResult::Grew {
-                direction,
-                slime_trail,
-                segments: _,
-            } => format!(
-                "snek grew {} and left a slime trail at {:?}",
-                direction.describe(),
-                slime_trail
-            ),
-            SlitherResult::Slithered {
-                direction,
-                slime_trail,
-                segments: _,
-            } => {
-                format!(
-                    "snek slithered {} and left a slime trail at {:?}",
-                    direction.describe(),
-                    slime_trail
-                )
-            }
-            SlitherResult::AteTheWorld => "snek ate the world".to_string(),
+    pub fn grew(direction: &Direction) -> Self {
+        Self {
+            direction: *direction,
+            result_type: SlitherResultType::Grew,
+            slime_trail: None,
         }
     }
 
-    pub fn get_direction(&self) -> Option<Direction> {
-        match self {
-            SlitherResult::Grew {
-                direction,
-                segments: _,
-                slime_trail: _,
-            }
-            | SlitherResult::Slithered {
-                direction,
-                segments: _,
-                slime_trail: _,
-            } => Some(*direction),
-            _ => None,
+    pub fn ate_the_world(direction: &Direction) -> Self {
+        Self {
+            direction: *direction,
+            result_type: SlitherResultType::AteTheWorld,
+            slime_trail: None,
         }
     }
+
+    pub fn slithered(direction: &Direction, slime_trail: Position) -> Self {
+        Self {
+            direction: *direction,
+            result_type: SlitherResultType::Slithered,
+            slime_trail: Some(slime_trail),
+        }
+    }
+
+    pub fn died(direction: &Direction, slime_trail: Position, death_cause: &DeathCause) -> Self {
+        Self {
+            direction: *direction,
+            result_type: SlitherResultType::Died {
+                death_cause: *death_cause,
+            },
+            slime_trail: Some(slime_trail),
+        }
+    }
+
+    pub fn describe(&self) -> String {
+        let action = match self.result_type {
+            SlitherResultType::Died { death_cause } => {
+                format!("snek died because {}", death_cause.describe())
+            }
+            SlitherResultType::Grew => format!("snek grew {}", self.direction.describe()),
+            SlitherResultType::Slithered => format!("snek slithered {}", self.direction.describe()),
+            SlitherResultType::AteTheWorld => "snek ate the world".to_string(),
+        };
+        if let Some(slime_trail) = self.slime_trail {
+            let (x, y) = slime_trail.get_coordinates();
+            format!("{}, leaving a slime trail at ({}, {})", action, x, y)
+        } else {
+            action
+        }
+    }
+
+    pub fn get_direction(&self) -> Direction {
+        self.direction
+    }
+
+    pub fn get_type(&self) -> SlitherResultType {
+        self.result_type
+    }
+
+    pub fn get_slime_trail(&self) -> Option<Position> {
+        self.slime_trail
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SlitherResultType {
+    Died { death_cause: DeathCause },
+    Grew,
+    Slithered,
+    AteTheWorld,
 }

@@ -140,8 +140,6 @@ mod tests {
         let walls = Walls::new(6, 4);
         for x in 2..=4 {
             for y in 1..=2 {
-                dbg!(x, y);
-                println!("\n");
                 assert!(walls.is_position_inside(&Position::new(x, y)));
                 assert!(!walls.collides_with(&Position::new(x, y)));
             }
@@ -171,8 +169,6 @@ mod tests {
         let walls = Walls::new(4, 6);
         for x in 1..=2 {
             for y in 2..=4 {
-                dbg!(x, y);
-                println!("\n");
                 assert!(walls.is_position_inside(&Position::new(x, y)));
                 assert!(!walls.collides_with(&Position::new(x, y)));
             }
