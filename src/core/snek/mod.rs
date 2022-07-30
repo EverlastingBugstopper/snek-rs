@@ -3,6 +3,8 @@ mod direction;
 mod segment;
 mod slither;
 
+use std::collections::VecDeque;
+
 pub use death::DeathCause;
 pub use direction::Direction;
 pub use segment::Segment;
@@ -14,7 +16,7 @@ use rayon::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct Snek {
-    segments: Vec<Segment>,
+    segments: VecDeque<Segment>,
     alive: bool,
 }
 
@@ -27,7 +29,7 @@ impl Default for Snek {
 impl Snek {
     pub fn baby_snek(start: Position, direction: Direction) -> Self {
         Snek {
-            segments: vec![Segment::new_head(start, direction)],
+            segments: vec![Segment::new_head(start, direction)].into(),
             alive: true,
         }
     }
@@ -36,13 +38,13 @@ impl Snek {
         if len == 0 {
             panic!("snek must have a length of at least 1")
         }
-        let mut segments = Vec::new();
+        let mut segments = VecDeque::new();
         let mut position = start;
         for i in 0..len {
             if i == len - 1 {
-                segments.push(Segment::new_head(position, direction));
+                segments.push_back(Segment::new_head(position, direction));
             } else {
-                segments.push(Segment::new_tail(position, direction));
+                segments.push_back(Segment::new_tail(position, direction));
             }
             position = position.neighbor(direction).unwrap_or_else(|| panic!(
                 "invalid snek configuration. starting the tail at {:?} pointing {:?} with len {} makes segment {} out of bounds",
@@ -60,7 +62,7 @@ impl Snek {
         self.segments.get(index)
     }
 
-    pub fn get_segments(&self) -> Vec<Segment> {
+    pub fn get_segments(&self) -> VecDeque<Segment> {
         self.segments.clone()
     }
 
@@ -81,15 +83,19 @@ impl Snek {
     }
 
     pub fn get_head(&self) -> &Segment {
-        self.segments.last().unwrap()
+        self.segments.back().unwrap()
     }
 
     pub(crate) fn get_head_mut(&mut self) -> &mut Segment {
-        self.segments.last_mut().unwrap()
+        self.segments.back_mut().unwrap()
     }
 
-    pub fn get_tail(&self) -> &[Segment] {
-        &self.segments[0..self.segments.len() - 1]
+    fn get_tail(&self) -> Vec<Segment> {
+        let mut tail = Vec::with_capacity(self.segments.len() - 1);
+        for segment in self.segments.iter() {
+            tail.push(*segment)
+        }
+        tail
     }
 
     pub fn grow(&mut self, direction: &Direction) {
@@ -102,15 +108,15 @@ impl Snek {
         // an invalid position. right?
         new_head.set_position(&new_head.get_position().neighbor(*direction).unwrap());
         new_head.set_direction(direction);
-        self.segments.push(new_head);
+        self.segments.push_back(new_head);
     }
 
     /// slithers the snek in a direction
     /// returning the slime trail position
     pub fn slither(&mut self, direction: &Direction) -> Position {
         self.grow(direction);
-        let slime_trail = *self.segments.first().unwrap();
-        self.segments.remove(0);
+        let slime_trail = *self.segments.front().unwrap();
+        self.segments.pop_front().unwrap();
         slime_trail.get_position()
     }
 

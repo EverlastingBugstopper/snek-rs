@@ -1,23 +1,26 @@
-use crate::core::{Apple, DeathCause, Direction, Position, Segment, SlitherResultType, State};
-
-use crossbeam_channel::unbounded;
+use crate::core::{Board, DeathEvent, Direction, ScoreEvent, SlitherEvent};
 
 use cursive::{
-    event::{Event, EventResult},
+    direction::Orientation,
+    event::{Event as CursiveEvent, EventResult},
     view::View,
     views::{Dialog, LinearLayout, NamedView, TextView, ViewRef},
     Cursive, Printer, Vec2,
 };
 
-use rayon::prelude::*;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 pub fn new_game(app: &mut Cursive) {
     tracing::debug!("new game");
-    let board_view = BoardView::new();
-    let score_view = TextView::new(board_view.get_score_content()).center();
+    let board = Board::new(6, 6);
+    tracing::info!("creating board view");
+    let board_view = BoardView::new(Arc::new(Mutex::new(board)));
+    tracing::info!("created board view");
+    let score_view = TextView::new(board_view.get_score_content(0)).center();
     let named_board_view = NamedView::new("board", board_view);
     let named_score_view = NamedView::new("score", score_view);
     app.pop_layer();
+
     // let wrapped_view; // replae linear layout with wrapped view
     // implement required_size on the score view
     app.add_fullscreen_layer(
@@ -26,40 +29,50 @@ pub fn new_game(app: &mut Cursive) {
             .child(named_board_view),
     );
     app.focus_name("board").unwrap();
-    app.set_fps(6);
+    app.set_fps(30);
+}
+
+struct ScoreView {
+    has_resized: bool,
+    pub size: Vec2,
+    pub score: usize,
 }
 
 struct BoardView {
     has_resized: bool,
     pub size: Vec2,
-    pub cells: Vec<Cell>,
-    state: State,
+    pub board: Arc<Mutex<Board>>,
     offset: usize,
 }
 
 impl BoardView {
-    pub fn new() -> Self {
-        let min_width = 6;
-        let min_height = 6;
-        BoardView {
-            size: Vec2::new(min_width, min_height),
-            cells: vec![Cell::Free; min_width * min_height],
-            state: State::new(min_width, min_height),
+    pub fn new(board: Arc<Mutex<Board>>) -> Self {
+        let this_board = board.clone();
+        let mut b = this_board.lock().unwrap();
+        let (width, height) = (b.get_width(), b.get_height());
+        b.start();
+        let board = this_board.clone();
+        let view = BoardView {
+            size: Vec2::new(width, height),
+            board,
             has_resized: false,
             offset: 2,
-        }
+        };
+
+        view
+    }
+
+    fn get_board(&self) -> MutexGuard<Board> {
+        self.board.lock().unwrap()
     }
 
     fn turn_snek(&mut self, direction: Direction) -> EventResult {
-        if self.state.turn_snek(direction) {
-            let mut wormy_head = *self.state.get_snek().get_head();
-            wormy_head.set_direction(&direction);
-            self.draw_segment(&wormy_head);
-        }
+        self.get_board().user_directional_input(direction);
         EventResult::Consumed(None)
     }
 
-    fn pause(&mut self) -> EventResult {
+    fn pause(&self) -> EventResult {
+        self.get_board().pause();
         EventResult::with_cb(|s| {
             let old_fps = s.fps();
             let controls_dialog = Dialog::text(
@@ -82,64 +95,30 @@ ssslither ~~~> wasssd
         })
     }
 
-    fn tick(&mut self) -> EventResult {
-        let old_apple = self.state.get_apple().get_position();
-        let slither_result = self.state.tick();
-        if let Some(slime_trail) = slither_result.get_slime_trail() {
-            self.free_cell(slime_trail);
-        }
-        self.update_apple(Some(old_apple));
-        self.state
-            .get_snek()
-            .get_segments()
-            .iter()
-            .for_each(|s| self.draw_segment(s));
-        match slither_result.get_type() {
-            SlitherResultType::Died { death_cause } => self.die_alog(death_cause),
-            SlitherResultType::AteTheWorld => EventResult::with_cb(|s| {
-                s.set_autorefresh(false);
-                s.add_layer(Dialog::text("snek ate the world!").button("Ok", |s| {
-                    s.pop_layer();
-                    s.pop_layer();
-                    new_game(s);
-                }));
-            }),
-            SlitherResultType::Grew => {
-                let score_content = self.get_score_content();
-                EventResult::with_cb(move |s| {
-                    let mut score_view: ViewRef<TextView> = s.find_name("score").unwrap();
-                    score_view.set_content(&score_content);
-                })
-            }
-            SlitherResultType::Slithered => EventResult::Consumed(None),
-        }
+    fn update_score(&self, score_event: ScoreEvent) -> EventResult {
+        let score_content = self.get_score_content(score_event.get_score());
+        EventResult::with_cb(move |s| {
+            let mut score_view: ViewRef<TextView> = s.find_name("score").unwrap();
+            score_view.set_content(&score_content);
+        })
     }
 
     fn resize(&mut self, constraints: Vec2) {
         if !self.has_resized {
             if constraints > self.size {
                 self.size = constraints;
-                self.state = State::new(constraints.x, constraints.y);
-                self.cells = vec![Cell::Free; constraints.x * constraints.y];
+                let mut board = self.get_board();
+                board.set_width(constraints.x);
+                board.set_height(constraints.y);
+                self.get_board().start();
             }
-            self.update_walls();
-            assert_eq!(
-                self.cells.last().unwrap(),
-                &Cell::Wall(WallType::BottomRightCorner)
-            );
-            self.update_apple(None);
-            self.state
-                .get_snek()
-                .get_segments()
-                .iter()
-                .for_each(|s| self.draw_segment(s));
             self.has_resized = true;
             self.size = constraints;
         }
     }
 
-    fn die_alog(&mut self, death_cause: DeathCause) -> EventResult {
-        let text = death_cause.describe().to_string();
+    fn die_alog(&self, death_event: DeathEvent) -> EventResult {
+        let text = death_event.display();
         EventResult::with_cb(move |s| {
             s.add_layer(
                 Dialog::text(&text)
@@ -154,106 +133,59 @@ ssslither ~~~> wasssd
         })
     }
 
-    fn update_apple(&mut self, old_apple: Option<Position>) {
-        let apple = self.state.get_apple().to_owned();
-        if let Some(old_apple) = old_apple {
-            self.update_cell(old_apple, Cell::Free);
-        }
-        self.update_cell(apple.get_position(), Cell::Apple(apple));
+    fn permanent_win(&self) -> EventResult {
+        EventResult::with_cb(|s| {
+            s.set_autorefresh(false);
+            s.add_layer(Dialog::text("snek ate the world!").button("Ok", |s| {
+                s.pop_layer();
+                s.pop_layer();
+                new_game(s);
+            }));
+        })
     }
 
-    fn draw_segment(&mut self, segment: &Segment) {
-        let position = segment.get_position();
-        let cell = Cell::Snek(*segment);
-        self.update_cell(position, cell);
+    fn get_score_content(&self, score: usize) -> String {
+        format!("ssscore: {}", score)
+    }
+}
+
+impl View for ScoreView {
+    fn draw(&self, printer: &Printer) {
+        printer.print_line(
+            Orientation::Horizontal,
+            self.size,
+            self.size.x,
+            &format!("ssscore: {}", &self.score),
+        )
     }
 
-    fn free_cell(&mut self, position: Position) {
-        self.update_cell(position, Cell::Free)
-    }
-
-    fn update_cell(&mut self, position: Position, cell: Cell) {
-        let i = self.get_cell_idx_from_position(&position);
-        self.cells[i] = cell;
-    }
-
-    fn update_walls(&mut self) {
-        let walls = self.state.get_walls().clone();
-        let left_wall = walls.left_wall();
-        let right_wall = walls.right_wall();
-        let top_wall = walls.top_wall();
-        let bottom_wall = walls.bottom_wall();
-        for position in walls.get_positions() {
-            let (x, y) = position.get_coordinates();
-            let wall_type = match (
-                (x == left_wall, x == right_wall),
-                (y == top_wall, y == bottom_wall),
-            ) {
-                ((true, false), (true, false)) => WallType::TopLeftCorner,
-                ((false, true), (true, false)) => WallType::TopRightCorner,
-                ((true, false), (false, true)) => WallType::BottomLeftCorner,
-                ((false, true), (false, true)) => WallType::BottomRightCorner,
-                ((true, false), (false, false)) => WallType::LeftWall,
-                ((false, true), (false, false)) => WallType::RightWall,
-                ((false, false), (true, false)) => WallType::TopWall,
-                ((false, false), (false, true)) => WallType::BottomWall,
-                _ => {
-                    unreachable!("{:?} is a bad wall segment", position)
-                }
-            };
-            self.update_cell(position, Cell::Wall(wall_type));
+    fn required_size(&mut self, constraints: Vec2) -> Vec2 {
+        Vec2 {
+            x: (constraints.x),
+            y: 2,
         }
     }
 
-    fn get_cell_idx_from_position(&self, position: &Position) -> usize {
-        let (x, y) = position.get_coordinates();
-        x + (self.size.x * y)
-    }
-
-    fn get_position_from_cell_idx(&self, cell_idx: usize) -> Position {
-        let x = (cell_idx % self.size.x) * 2;
-        let y = cell_idx / self.size.x;
-        Position::new(x, y)
-    }
-
-    fn get_score_content(&self) -> String {
-        format!("ssscore: {}", self.state.get_score())
-    }
-
-    fn user_resized(&mut self) -> EventResult {
-        self.die_alog(DeathCause::Resized)
+    fn needs_relayout(&self) -> bool {
+        !self.has_resized
     }
 }
 
 impl View for BoardView {
     fn draw(&self, printer: &Printer) {
-        let (sender, receiver) = unbounded();
-        self.cells
-            .par_iter()
-            .enumerate()
-            .for_each_with(sender, |sender, (i, cell)| {
-                let position = self.get_position_from_cell_idx(i);
-                if let Cell::Snek(segment) = cell {
-                    tracing::info!("{}", segment.display());
-                }
-                if let Cell::Free = cell {
-                } else {
-                    sender
-                        .send((position.get_coordinates(), cell.display()))
-                        .unwrap();
-                }
-            });
-        receiver.iter().for_each(|((x, y), text)| {
-            printer.print((x + self.offset, y), &text);
-        });
+        self.get_board()
+            .maybe_draw_events()
+            .iter()
+            .for_each(|draw_event| {
+                let (x, y) = draw_event.get_coordinates();
+                printer.print((x + self.offset, y), &draw_event.display());
+            })
     }
     fn required_size(&mut self, constraints: Vec2) -> Vec2 {
         if !self.has_resized {
-            let (width, height) = term_size::dimensions().unwrap();
-            tracing::info!("resizing to width: {}, height: {}", width, height);
             let new_size = Vec2 {
-                x: (width / 2) - self.offset,
-                y: height - 1,
+                x: (constraints.x / 2) - self.offset,
+                y: constraints.y,
             };
             self.resize(new_size);
         }
@@ -264,55 +196,29 @@ impl View for BoardView {
         !self.has_resized
     }
 
-    fn on_event(&mut self, event: Event) -> EventResult {
+    fn on_event(&mut self, event: CursiveEvent) -> EventResult {
         match event {
-            Event::Char('w') => self.turn_snek(Direction::Up),
-            Event::Char('a') => self.turn_snek(Direction::Left),
-            Event::Char('s') => self.turn_snek(Direction::Down),
-            Event::Char('d') => self.turn_snek(Direction::Right),
-            Event::Char('p') | Event::FocusLost => self.pause(),
-            Event::Refresh => self.tick(),
-            Event::WindowResize => self.user_resized(),
-            _ => EventResult::Ignored,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum Cell {
-    Snek(Segment),
-    Apple(Apple),
-    Wall(WallType),
-    Free,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum WallType {
-    TopWall,
-    BottomWall,
-    LeftWall,
-    RightWall,
-    TopLeftCorner,
-    BottomLeftCorner,
-    TopRightCorner,
-    BottomRightCorner,
-}
-
-impl Cell {
-    fn display(&self) -> String {
-        match self {
-            Cell::Snek(segment) => segment.display().to_string(),
-            Cell::Apple(_) => "🍎".to_string(),
-            Cell::Wall(wall_type) => match wall_type {
-                WallType::TopLeftCorner => "╭─",
-                WallType::BottomLeftCorner => "╰─",
-                WallType::BottomRightCorner => "╯",
-                WallType::TopRightCorner => "╮",
-                WallType::TopWall | WallType::BottomWall => "──",
-                WallType::LeftWall | WallType::RightWall => "│",
+            CursiveEvent::Char('w') => self.turn_snek(Direction::Up),
+            CursiveEvent::Char('a') => self.turn_snek(Direction::Left),
+            CursiveEvent::Char('s') => self.turn_snek(Direction::Down),
+            CursiveEvent::Char('d') => self.turn_snek(Direction::Right),
+            CursiveEvent::Char('p') | CursiveEvent::FocusLost => self.pause(),
+            CursiveEvent::Refresh => {
+                let board = self.get_board();
+                let event_result = if board.is_paused() {
+                    Some(self.pause())
+                } else {
+                    board
+                        .maybe_slither_event()
+                        .map(|slither_event| match slither_event {
+                            SlitherEvent::Die(death_event) => self.die_alog(death_event),
+                            SlitherEvent::Score(score_event) => self.update_score(score_event),
+                            SlitherEvent::Win => self.permanent_win(),
+                        })
+                };
+                event_result.unwrap_or(EventResult::Ignored)
             }
-            .to_string(),
-            Cell::Free => "  ".to_string(),
+            _ => EventResult::Ignored,
         }
     }
 }

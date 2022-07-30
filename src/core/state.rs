@@ -1,16 +1,18 @@
 use crate::core::{
-    Apple, DeathCause, Direction, Position, Scoreboard, SlitherAction, SlitherResult, Snek, Walls,
+    Apple, DeathCause, Direction, Position, Scoreboard, SlitherAction, SlitherResult, Snek, Wall,
+    Walls,
 };
 
 use rand::{seq::SliceRandom, thread_rng};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct State {
     walls: Walls,
     scoreboard: Scoreboard,
     snek: Snek,
     apple: Apple,
     direction: Direction,
+    is_slithering: bool,
 }
 
 impl State {
@@ -32,40 +34,54 @@ impl State {
             snek,
             scoreboard,
             direction,
+            is_slithering: false,
         };
         state.new_apple();
         state
     }
 
+    pub fn start(&mut self) {
+        self.is_slithering = true;
+    }
+
+    pub fn stop(&mut self) {
+        self.is_slithering = false;
+    }
+
+    pub fn is_slithering(&self) -> bool {
+        self.is_slithering
+    }
+
     pub fn new_apple(&mut self) {
         let mut possible_positions = Vec::new();
-        for x in self.walls.left_wall()..=self.walls.right_wall() {
-            for y in self.walls.top_wall()..=self.walls.bottom_wall() {
-                let position = Position::new(x, y);
-                let mut position_is_valid = true;
-                for segment in self.snek.get_segments() {
-                    if segment.get_position() == position {
-                        position_is_valid = false;
-                    }
-                }
-                for wall_position in self.get_walls().get_positions() {
-                    if wall_position == position {
-                        position_is_valid = false;
-                    }
-                }
-                if position_is_valid {
-                    possible_positions.push(Position::new(x, y));
+        for candidate in self.walls.interior() {
+            let mut candidate_is_valid = true;
+            for segment in self.snek.get_segments() {
+                if segment.get_position() == candidate {
+                    candidate_is_valid = false;
                 }
             }
+            if candidate_is_valid {
+                possible_positions.push(candidate);
+            }
         }
+
         let mut rng = thread_rng();
         self.apple = Apple::new(*possible_positions.choose(&mut rng).unwrap());
     }
 
     #[tracing::instrument(level = "debug")]
     pub fn tick(&mut self) -> SlitherResult {
-        let slither_action = self.get_slither_action();
-        self.take_slither_action(&slither_action)
+        if self.is_slithering {
+            let slither_action = self.get_slither_action();
+            self.take_slither_action(&slither_action)
+        } else {
+            unreachable!("somebody called tick and we don't think we're supposed to.")
+        }
+    }
+
+    pub fn perimeter(&self) -> Vec<Wall> {
+        self.walls.perimeter()
     }
 
     pub fn get_direction(&self) -> Direction {
@@ -134,14 +150,15 @@ impl State {
                 SlitherResult::died(direction, slime_trail, death_cause)
             }
             SlitherAction::Grow(direction) => {
+                let old_apple = self.apple.get_position();
                 self.snek.grow(direction);
                 self.scoreboard.increment_score();
                 tracing::info!("ate an apple, new score: {}", self.scoreboard.get_score());
                 if self.snek.count_segments() == self.walls.get_max_segments() {
-                    SlitherResult::ate_the_world(direction)
+                    SlitherResult::ate_the_world(direction, old_apple)
                 } else {
                     self.new_apple();
-                    SlitherResult::grew(direction)
+                    SlitherResult::grew(direction, old_apple)
                 }
             }
             SlitherAction::Slither(direction) => {
@@ -388,12 +405,7 @@ mod tests {
             Position::new(1, 1)
         );
         assert_eq!(
-            state
-                .get_snek()
-                .get_segments()
-                .first()
-                .unwrap()
-                .get_position(),
+            state.get_snek().get_head().get_position(),
             Position::new(1, 1)
         );
         assert_eq!(

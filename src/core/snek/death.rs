@@ -6,11 +6,12 @@ pub enum DeathCause {
 }
 
 impl DeathCause {
-    pub fn describe(&self) -> &str {
+    pub fn display(&self) -> String {
         match self {
             DeathCause::Wall => "it ran into the wall",
             DeathCause::Tail => "it ran into its own tail",
             DeathCause::Resized => "you resized the terminal",
         }
+        .to_string()
     }
 }

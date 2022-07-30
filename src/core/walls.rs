@@ -4,11 +4,52 @@ use crate::core::Position;
 pub struct Walls {
     width: usize,
     height: usize,
+    top_wall_y: usize,
+    bottom_wall_y: usize,
+    left_wall_x: usize,
+    right_wall_x: usize,
+    walls: Vec<Wall>,
 }
 
 impl Walls {
     pub fn new(width: usize, height: usize) -> Self {
-        Self { width, height }
+        let mut walls = Vec::with_capacity(width * height);
+        let top_wall_y = 0;
+        let left_wall_x = 0;
+        let bottom_wall_y = height - 1;
+        let right_wall_x = width - 1;
+        // create the top and bottom walls
+        (left_wall_x..=right_wall_x).enumerate().for_each(|(i, x)| {
+            let bottom_wall_position = Position::new(x, bottom_wall_y);
+            let top_wall_position = Position::new(x, top_wall_y);
+            let (top_wall_type, bottom_wall_type) = if i == left_wall_x {
+                (WallType::TopLeftCorner, WallType::BottomLeftCorner)
+            } else if i == right_wall_x {
+                (WallType::TopRightCorner, WallType::BottomRightCorner)
+            } else {
+                (WallType::TopWall, WallType::BottomWall)
+            };
+            walls.push(Wall::new(bottom_wall_position, bottom_wall_type));
+            walls.push(Wall::new(top_wall_position, top_wall_type));
+        });
+
+        (top_wall_y..=bottom_wall_y).enumerate().for_each(|(i, y)| {
+            let left_wall_position = Position::new(left_wall_x, y);
+            let right_wall_position = Position::new(right_wall_x, y);
+            if i != top_wall_y && i != bottom_wall_y {
+                walls.push(Wall::new(left_wall_position, WallType::LeftWall));
+                walls.push(Wall::new(right_wall_position, WallType::RightWall));
+            }
+        });
+        Self {
+            walls,
+            width,
+            height,
+            top_wall_y,
+            bottom_wall_y,
+            left_wall_x,
+            right_wall_x,
+        }
     }
     pub fn collides_with(&self, position: &Position) -> bool {
         !self.is_position_inside(position)
@@ -19,46 +60,83 @@ impl Walls {
         self.is_x_inside(x) && self.is_y_inside(y)
     }
 
+    pub fn perimeter(&self) -> Vec<Wall> {
+        self.walls.clone()
+    }
+
+    pub fn interior(&self) -> Vec<Position> {
+        let left = self.left_wall_x + 1;
+        let right = self.right_wall_x - 1;
+        let top = self.top_wall_y + 1;
+        let bottom = self.bottom_wall_y - 1;
+        let mut interior = Vec::with_capacity((right - left) * (bottom - top));
+        for x in left..=right {
+            for y in top..=bottom {
+                interior.push(Position::new(x, y));
+            }
+        }
+        interior
+    }
+
     pub(crate) fn get_max_segments(&self) -> usize {
         (self.width - 2) * (self.height - 2)
     }
 
     fn is_x_inside(&self, x: usize) -> bool {
-        x > self.left_wall() && x < self.right_wall()
+        x > self.left_wall_x && x < self.right_wall_x
     }
 
     fn is_y_inside(&self, y: usize) -> bool {
-        y > self.top_wall() && y < self.bottom_wall()
+        y > self.top_wall_y && y < self.bottom_wall_y
     }
+}
 
-    pub(crate) fn top_wall(&self) -> usize {
-        0
-    }
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Wall {
+    position: Position,
+    wall_type: WallType,
+}
 
-    pub(crate) fn left_wall(&self) -> usize {
-        0
-    }
-
-    pub(crate) fn bottom_wall(&self) -> usize {
-        self.height - 1
-    }
-
-    pub(crate) fn right_wall(&self) -> usize {
-        self.width - 1
-    }
-
-    pub fn get_positions(&self) -> Vec<Position> {
-        let mut positions = Vec::new();
-        for x in self.left_wall()..=self.right_wall() {
-            positions.push(Position::new(x, self.bottom_wall()));
-            positions.push(Position::new(x, self.top_wall()));
+impl Wall {
+    fn new(position: Position, wall_type: WallType) -> Self {
+        Self {
+            position,
+            wall_type,
         }
-        for y in self.top_wall()..=self.bottom_wall() {
-            positions.push(Position::new(self.left_wall(), y));
-            positions.push(Position::new(self.right_wall(), y));
+    }
+
+    pub fn get_position(&self) -> Position {
+        self.position
+    }
+
+    pub fn get_type(&self) -> WallType {
+        self.wall_type
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum WallType {
+    TopWall,
+    BottomWall,
+    LeftWall,
+    RightWall,
+    TopLeftCorner,
+    BottomLeftCorner,
+    TopRightCorner,
+    BottomRightCorner,
+}
+
+impl WallType {
+    pub fn display(&self) -> String {
+        match self {
+            WallType::TopLeftCorner => "╭─",
+            WallType::BottomLeftCorner => "╰─",
+            WallType::BottomRightCorner => "╯",
+            WallType::TopRightCorner => "╮",
+            WallType::TopWall | WallType::BottomWall => "──",
+            WallType::LeftWall | WallType::RightWall => "│",
         }
-        tracing::info!("{:?}", &positions);
-        positions
+        .to_string()
     }
 }
 

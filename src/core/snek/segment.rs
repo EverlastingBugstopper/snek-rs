@@ -78,7 +78,7 @@ impl Segment {
         self.position.neighbor(direction.opposite())
     }
 
-    pub fn display(&self) -> &str {
+    pub fn display(&self) -> String {
         if self.is_head() {
             if let SegmentType::DeadHead = self.segment_type {
                 "💀"
@@ -101,6 +101,7 @@ impl Segment {
                 _ => "",
             }
         }
+        .to_string()
     }
 }
 
